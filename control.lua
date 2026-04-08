@@ -6,7 +6,11 @@ local vector2 = require("vector2")
 
 local musicProgressCounter = 0
 
+local config = {
+    musicDistanceFactor = 2,
 
+    debug = true
+}
 
 local function tick()
 
@@ -23,34 +27,55 @@ local function tick()
     --game.print("Trains on surface nauvis: " .. #trains)
 
     local player = game.players[1]
-    local playerPosition = {0,0}
-    playerPosition = vector2.posToTab(player.position)
+    local playerPosition = player.position
+    
+    local train = trains[1]
+    local trainSpeedVolumeFactor = train.speed / train.max_forward_speed
+    local trainPosition = train.carriages[1].position
+
+    if trainSpeedVolumeFactor < 0.1 then
+        musicProgressCounter = 0 --scrap
+    end
+
 
     if trains == nil or #trains == 0 then
         --game.print("No trains found on surface nauvis.")
         return
     end
-    rendering.draw_line{
-        color = {r = 1, g = 0, b = 0},   -- Red color
-        width = 1,                       -- Line width
-        from = playerPosition,
-        to = trains[1].carriages[1].position,  -- Draw to the first train's first carriage
-        surface = game.surfaces[1],      -- Draw on the first surface (usually 'nauvis')
-        time_to_live = 1                 -- Line will last for 600 ticks (10 seconds)
-    }
+    if config.debug then
+        rendering.draw_line{
+            color = {r = 1, g = 0, b = 0},   -- Red color
+            width = 3,                       -- Line width
+            from = playerPosition,
+            to = trainPosition,  -- Draw to the first train's first carriage
+            surface = game.surfaces[1],      -- Draw on the first surface (usually 'nauvis')
+            time_to_live = 1                 -- Line will last for 600 ticks (10 seconds) 
+        }
+    end
+    
 
     if game.tick % 12 == 0 then
-            play(player, trains[1].carriages[1].position, 0.4)
+            play(player, trains[1].carriages[1].position, 0.4, trainSpeedVolumeFactor)
+            if config.debug then
+                rendering.draw_circle{
+                    color = {1,1,1,1},   -- Red color
+                    width = 3,
+                    radius = 1,
+                    target = trainPosition,
+                    surface = game.surfaces[1],
+                    time_to_live = 120,
+                }
+            end
     end
 end
 
 
 
-function play(player, pos, vol)
+function play(player, pos, vol, trainSpeedVolumeFactor)
     player.play_sound({
         path = string.format("thomas%03d", musicProgressCounter),
         position = pos,
-        volume_modifier = vol
+        volume_modifier = vol * trainSpeedVolumeFactor
     })
     
     musicProgressCounter = musicProgressCounter + 1

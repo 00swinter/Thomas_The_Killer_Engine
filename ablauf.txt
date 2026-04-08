@@ -1,5 +1,0 @@
-get thomas()
-
-if trains exist
-
-if
