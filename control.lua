@@ -4,15 +4,84 @@ local vector2 = require("vector2")
 
 
 
+local function get_inverse_square_intensity(source_power, distance)
+    local minimum_distance = 1.0
+    if distance < minimum_distance then
+        distance = minimum_distance
+    end
+
+    local denominator = 4 * math.pi * (distance * distance)
+    local intensity = source_power / denominator
+
+    local max_volume = 1.0
+    if intensity > max_volume then
+        return max_volume
+    end
+
+    return intensity
+end
+
+local function execute_swap(entity)
+    local entity_surface = entity.surface
+    local entity_position = entity.position
+    local entity_force = entity.force
+    local entity_direction = entity.direction
+    local entity_color = entity.color
+    
+    local train_reference = entity.train
+    local train_schedule = nil
+    
+    if train_reference then
+        train_schedule = train_reference.schedule
+    end
+
+    entity.destroy()
+
+    local custom_locomotive = entity_surface.create_entity{
+        name = "thomas_locomotive",
+        position = entity_position,
+        force = entity_force,
+        direction = entity_direction
+    }
+    
+    if entity_color then
+        custom_locomotive.color = entity_color
+    end
+    
+    if train_schedule and custom_locomotive.train then
+        custom_locomotive.train.schedule = train_schedule
+    end
+end
+
+
 local musicProgressCounter = 0
 
+local init = false
+
 local config = {
-    musicDistanceFactor = 2,
+    musicDistanceFactor = 0.8,
 
     debug = true
 }
 
+local function spawn_smoke(surface, center_position)
+    for i = 1, 150 do
+        local random_x = math.random() * 10 - 5
+        local random_y = math.random() * 10 - 5
+        
+        surface.create_trivial_smoke{
+            name = "thomas_heavy_smoke",
+            position = {
+                x = center_position.x + random_x,
+                y = center_position.y + random_y
+            }
+        }
+    end
+end
+
 local function tick()
+
+    
 
     -- update loop
     --local spu = 3
@@ -21,7 +90,7 @@ local function tick()
     --end
 
     local trainFilter = {
-        surface = "nauvis"
+        surface = "nauvis",
     }
     local trains = game.train_manager.get_trains(trainFilter)
     --game.print("Trains on surface nauvis: " .. #trains)
@@ -30,11 +99,14 @@ local function tick()
     local playerPosition = player.position
     
     local train = trains[1]
+
+    
+
     local trainSpeedVolumeFactor = train.speed / train.max_forward_speed
     local trainPosition = train.carriages[1].position
 
     if trainSpeedVolumeFactor < 0.1 then
-        musicProgressCounter = 0 --scrap
+        --musicProgressCounter = 0 --scrap
     end
 
 
@@ -51,35 +123,85 @@ local function tick()
             surface = game.surfaces[1],      -- Draw on the first surface (usually 'nauvis')
             time_to_live = 1                 -- Line will last for 600 ticks (10 seconds) 
         }
+        
     end
     
 
     if game.tick % 12 == 0 then
-            play(player, trains[1].carriages[1].position, 0.4, trainSpeedVolumeFactor)
-            if config.debug then
-                rendering.draw_circle{
-                    color = {1,1,1,1},   -- Red color
-                    width = 3,
-                    radius = 1,
-                    target = trainPosition,
-                    surface = game.surfaces[1],
-                    time_to_live = 120,
-                }
+            local toTrain = vector2.sub(trainPosition, playerPosition)
+            local toSound = vector2.scale(toTrain, config.musicDistanceFactor)
+            --game.print(vector2.length(toSound))
+            toSound = vector2.clampLength(toSound, 1,40);
+            local soundPos = vector2.add(playerPosition, toSound)
+
+            local distanceTrain = vector2.length(toTrain)
+
+            local volumeIntensity = get_inverse_square_intensity(8000, distanceTrain)
+
+            --game.print(volumeIntensity)
+
+            if distanceTrain < 200 then
+                play(player, soundPos, volumeIntensity)
+
             end
+
+            --spawn_smoke(player.surface, playerPosition)
+
+            if distanceTrain < 100 then
+            end
+            
+            --distance
+            rendering.draw_text{
+                text = string.format("%.1f", vector2.length(toTrain)),
+                surface = game.surfaces[1],
+                target = player.character,
+                color = {r = 0.7, g = 0.7, b = 1},
+                time_to_live = 12,
+                scale = 1.5
+            }
+    end
+    
+    if not init then
+        --execute_swap(train.carriages[1])
+        init = true
     end
 end
 
 
 
-function play(player, pos, vol, trainSpeedVolumeFactor)
+function play(player, pos, vol)
+    
     player.play_sound({
         path = string.format("thomas%03d", musicProgressCounter),
         position = pos,
-        volume_modifier = vol * trainSpeedVolumeFactor
+        volume_modifier = vol
     })
     
     musicProgressCounter = musicProgressCounter + 1
     musicProgressCounter = musicProgressCounter % 350  -- Reset to 0 after reaching 350
+
+
+    if config.debug then
+        rendering.draw_circle{
+            color = {1,1,1,1},   -- Red color
+            width = 3,
+            radius = 2,
+            target = pos,
+            surface = game.surfaces[1],
+            time_to_live = 60,
+        }
+        rendering.draw_circle{
+            color = {1,1,1,1},   -- Red color
+            width = 3,
+            radius = (vol / 1) * 2,
+            filled = true,
+            target = pos,
+            surface = game.surfaces[1],
+            time_to_live = 60,
+        }
+        
+    end
+
 end
 
 
