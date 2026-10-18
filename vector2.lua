@@ -32,8 +32,32 @@ function vector2.length(vec)
     return math.sqrt((x * x) + (y * y))
 end
 
+function vector2.clampLength(vec, min, max)
+    local length = vector2.length(vec)
+    
+    -- Safety check: Prevent division by zero if the vector has no length
+    if length == 0 then
+        return {0, 0}
+    end
+    
+    if length < min then
+        return vector2.scale(vec, min / length)
+    elseif length > max then
+        return vector2.scale(vec, max / length)
+    else
+        return vec
+    end
+end
+
 function vector2.normalize(vec)
-    return vector2.scale(vec, 1 / vector2.length(vec))
+    local length = vector2.length(vec)
+    
+    -- Safety check: Prevent division by zero
+    if length == 0 then
+        return {0, 0}
+    end
+    
+    return vector2.scale(vec, 1 / length)
 end
 
 return vector2
